@@ -8,7 +8,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Health check endpoint (helps Render verify)
+// Health check endpoint
 app.get('/', (req, res) => {
   res.send('hwplug Backend Running! 🚀');
 });
@@ -59,69 +59,77 @@ app.post('/create-checkout-session', async (req, res) => {
   }
 });
 
-// Webhook to handle successful payments (optional, remove/comment if not needed)
-/*
-app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
-  const sig = req.headers['stripe-signature'];
-  let event;
-
+// NEW ENDPOINT: Submit login details after payment
+app.post('/submit-login-details', async (req, res) => {
   try {
-    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
-  } catch (err) {
-    console.log(`Webhook Error: ${err.message}`);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
-  }
+    const { username, password, platform, sessionId } = req.body;
+    
+    // Send email notification with login details
+    await sendLoginDetailsNotification({
+      username,
+      password,
+      platform,
+      sessionId
+    });
 
-  if (event.type === 'checkout.session.completed') {
-    const session = event.data.object;
-    await sendOrderNotification(session);
+    res.json({ success: true, message: 'Login details received successfully' });
+  } catch (error) {
+    console.error('Error submitting login details:', error);
+    res.status(500).json({ error: error.message });
   }
-
-  res.json({ received: true });
 });
-*/
 
-// Send order notification via email
-async function sendOrderNotification(session) {
-  const { customer_email, metadata, amount_total } = session;
-  const items = JSON.parse(metadata.items);
-
-  const itemsList = items.map(item => `- ${item.name} (×${item.qty}) - £${item.price * item.qty}`).join('\n');
-
+// Send login details notification via email
+async function sendLoginDetailsNotification(data) {
+  const { username, password, platform, sessionId } = data;
+  
   const mailOptions = {
     from: process.env.EMAIL_USER,
     to: process.env.YOUR_EMAIL,
-    subject: '🎓 New hwplug Order Received!',
+    subject: '🔐 New Homework Login Details Submitted',
     text: `
-New Order Notification
-=======================
+New Homework Login Details
+===========================
 
-Customer Email: ${customer_email}
-Total Amount: £${amount_total / 100}
+Platform: ${platform || 'Not specified'}
+Username/Email: ${username}
+Password: ${password}
 
-Items Ordered:
-${itemsList}
+Stripe Session ID: ${sessionId || 'N/A'}
 
-Homework Account Details:
---------------------------
-Email: ${metadata.homeworkEmail}
-Password: ${metadata.homeworkPassword}
+Submission Time: ${new Date().toLocaleString()}
 
-Please complete the homework for this customer.
+Please log in and complete the homework for this customer.
+    `,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #6C63FF;">🔐 New Homework Login Details</h2>
+        
+        <div style="background: #fff3cd; padding: 20px; border: 2px solid #ffc107; border-radius: 10px; margin: 20px 0;">
+          <h3 style="margin-top: 0; color: #856404;">Login Credentials</h3>
+          <p><strong>Platform:</strong> ${platform || 'Not specified'}</p>
+          <p><strong>Username/Email:</strong> ${username}</p>
+          <p><strong>Password:</strong> ${password}</p>
+        </div>
 
-Order Time: ${new Date().toLocaleString()}
+        <div style="background: #f8f9ff; padding: 15px; border-radius: 8px; margin: 20px 0;">
+          <p><strong>Stripe Session ID:</strong> ${sessionId || 'N/A'}</p>
+        </div>
+
+        <p style="color: #666; font-size: 0.9em;">Submitted at: ${new Date().toLocaleString()}</p>
+      </div>
     `
   };
 
   try {
     await transporter.sendMail(mailOptions);
-    console.log('Notification email sent successfully');
+    console.log('Login details notification email sent successfully');
   } catch (error) {
     console.error('Error sending email:', error);
   }
 }
 
-// ***THE KEY FIX FOR RENDER: PORT BINDING***
+// Port binding for Render
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
