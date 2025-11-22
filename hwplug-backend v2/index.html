@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>hwplug - Your Learning Marketplace</title>
+  <script src="https://js.stripe.com/v3/"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; background: linear-gradient(135deg, #f6f7fb 70%, #6C63FF 100%); color: #222; min-height: 100vh; }
+    header { background: linear-gradient(135deg, #6C63FF 0%, #5548d9 100%); color: #fff; padding: 1.5rem 2rem; box-shadow: 0 3px 12px rgba(50,50,150,0.15); }
+    .header-content { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
+    .logo { font-size: 2.5rem; font-weight: 900; background: linear-gradient(135deg, #fff 30%, #e0e0ff 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .tagline { font-size: 0.95rem; color: #e8e6ff; margin-top: 0.2rem; }
+    .user-section { display: flex; gap: 1rem; align-items: center; }
+    .auth-btns button { background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: #fff; padding: 0.6rem 1.2rem; border-radius: 8px; cursor: pointer; font-size: 0.9rem; font-weight: 600; transition: 0.2s; }
+    .auth-btns button:hover { background: rgba(255,255,255,0.3); }
+    .user-info { display: flex; align-items: center; gap: 1rem; }
+    .credits-badge { background: #00D084; color: #fff; padding: 0.5rem 1rem; border-radius: 20px; font-weight: 700; font-size: 0.9rem; }
+    .user-menu { position: relative; }
+    .user-btn { background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: #fff; padding: 0.6rem 1.2rem; border-radius: 8px; cursor: pointer; font-weight: 600; }
+    .dropdown { display: none; position: absolute; right: 0; top: 100%; margin-top: 0.5rem; background: #fff; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); min-width: 200px; z-index: 1000; }
+    .dropdown.show { display: block; }
+    .dropdown a { display: block; padding: 0.8rem 1.2rem; color: #333; text-decoration: none; border-bottom: 1px solid #f0f0f0; }
+    .dropdown a:last-child { border-bottom: none; }
+    .dropdown a:hover { background: #f5f5f5; }
+    .items { display: flex; justify-content: center; flex-wrap: wrap; margin: 2.5rem auto; gap: 1.8rem; max-width: 1100px; padding: 0 1rem; }
+    .item-card { background: #fff; border-radius: 16px; box-shadow: 0 3px 20px rgba(100,100,250,0.1); padding: 2rem 1.8rem; text-align: center; width: 240px; transition: transform 0.2s, box-shadow 0.2s; border: 2px solid #f0f0ff; }
+    .item-card:hover { transform: translateY(-6px); box-shadow: 0 6px 28px rgba(100,100,250,0.18); border-color: #c8c4ff; }
+    .item-title { font-size: 1.45rem; font-weight: 700; color: #333; margin-bottom: 0.6rem; }
+    .item-desc { font-size: 0.96rem; color: #555; min-height: 42px; margin-bottom: 1rem; }
+    .price { color: #6C63FF; font-size: 1.5rem; font-weight: 700; margin: 0.8rem 0 1.2rem 0; }
+    .add-btn { background: linear-gradient(135deg, #6C63FF 0%, #8b7dff 100%); color: #fff; padding: 0.75rem 2rem; border: none; border-radius: 10px; font-size: 1.08rem; font-weight: 600; cursor: pointer; transition: all 0.2s; width: 100%; }
+    .add-btn:hover { background: linear-gradient(135deg, #5548d9 0%, #7669ee 100%); transform: translateY(-2px); }
+    .cart { position: fixed; right: 2rem; top: 7rem; background: #fff; border-radius: 16px; box-shadow: 0 4px 24px rgba(100,100,250,0.2); padding: 1.5rem; width: 320px; max-height: 500px; overflow-y: auto; z-index: 100; }
+    .cart-title { font-size: 1.3rem; font-weight: 700; margin-bottom: 1rem; color: #333; }
+    .cart-items-list { list-style: none; margin-bottom: 1rem; }
+    .cart-item { display: flex; justify-content: space-between; align-items: center; padding: 0.8rem 0; border-bottom: 1px solid #f0f0f0; }
+    .cart-item-name { font-weight: 600; color: #333; }
+    .remove-btn { background: #ff4444; color: #fff; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; margin-left: 0.5rem; }
+    .cart-empty { text-align: center; color: #999; padding: 2rem 0; }
+    .cart-total { font-size: 1.2rem; font-weight: 700; color: #333; margin: 1rem 0; text-align: right; }
+    .checkout-btn { width: 100%; background: linear-gradient(135deg, #6C63FF 0%, #8b7dff 100%); color: #fff; padding: 1rem; border: none; border-radius: 10px; font-size: 1.1rem; font-weight: 700; cursor: pointer; transition: 0.2s; }
+    .checkout-btn:hover { background: linear-gradient(135deg, #5548d9 0%, #7669ee 100%); }
+    .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); overflow-y: auto; }
+    .modal-content { background: #fff; margin: 5% auto; padding: 2.5rem; border-radius: 16px; max-width: 500px; position: relative; }
+    .close-btn { position: absolute; right: 1.5rem; top: 1.5rem; font-size: 2rem; cursor: pointer; color: #999; line-height: 1; }
+    .close-btn:hover { color: #333; }
+    .modal-title { font-size: 1.8rem; font-weight: 700; margin-bottom: 1.5rem; color: #333; }
+    .form-group { margin-bottom: 1.2rem; text-align: left; }
+    .form-group label { display: block; font-weight: 600; margin-bottom: 0.5rem; color: #444; }
+    .form-group input { width: 100%; padding: 0.9rem; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 1rem; }
+    .form-group input:focus { outline: none; border-color: #6C63FF; }
+    .submit-btn { width: 100%; background: linear-gradient(135deg, #6C63FF 0%, #8b7dff 100%); color: #fff; padding: 1rem; border: none; border-radius: 10px; font-size: 1.1rem; font-weight: 700; cursor: pointer; margin-top: 1rem; transition: 0.2s; }
+    .submit-btn:hover { background: linear-gradient(135deg, #5548d9 0%, #7669ee 100%); }
+    .submit-btn:disabled { background: #ccc; cursor: not-allowed; }
+    .link-btn { background: none; border: none; color: #6C63FF; cursor: pointer; text-decoration: underline; font-size: 0.95rem; margin-top: 1rem; display: block; text-align: center; }
+    .error-msg { color: #ff4444; font-size: 0.9rem; margin-top: 0.5rem; }
+    footer { text-align: center; padding: 1.5rem; background: #ececff; color: #777; margin-top: 3.5rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-content">
+      <div>
+        <h1 class="logo">hwplug</h1>
+        <div class="tagline">Your one-stop shop for learning tools</div>
+      </div>
+      <div class="user-section">
+        <div id="authButtons" class="auth-btns">
+          <button onclick="openLoginModal()">Login</button>
+          <button onclick="openRegisterModal()">Sign Up</button>
+        </div>
+        <div id="userInfo" class="user-info" style="display: none;">
+          <div class="credits-badge">£<span id="userCredits">0</span> credit</div>
+          <div class="user-menu">
+            <button class="user-btn" onclick="toggleDropdown()"><span id="userName"></span> ▼</button>
+            <div id="userDropdown" class="dropdown">
+              <a href="#" onclick="showOrders(); return false;">My Orders</a>
+              <a href="#" onclick="showReferral(); return false;">Refer & Earn</a>
+              <a href="#" onclick="logout(); return false;">Logout</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <section class="items">
+    <div class="item-card">
+      <div class="item-title">Sparx Reader</div>
+      <div class="item-desc">Improve reading comprehension with interactive tasks</div>
+      <div class="price">&pound;2</div>
+      <button class="add-btn" onclick="addToCart('Sparx Reader', 2)">Add to Cart</button>
+    </div>
+    <div class="item-card">
+      <div class="item-title">Sparx Maths</div>
+      <div class="item-desc">Master maths with adaptive problem sets</div>
+      <div class="price">&pound;3</div>
+      <button class="add-btn" onclick="addToCart('Sparx Maths', 3)">Add to Cart</button>
+    </div>
+    <div class="item-card">
+      <div class="item-title">Educate</div>
+      <div class="item-desc">Explore science topics with engaging resources</div>
+      <div class="price">&pound;3</div>
+      <button class="add-btn" onclick="addToCart('Educate', 3)">Add to Cart</button>
+    </div>
+    <div class="item-card">
+      <div class="item-title">Seneca</div>
+      <div class="item-desc">Learn smarter with bite-sized lessons and quizzes</div>
+      <div class="price">&pound;2</div>
+      <button class="add-btn" onclick="addToCart('Seneca', 2)">Add to Cart</button>
+    </div>
+  </section>
+
+  <div class="cart">
+    <div class="cart-title">Your Cart</div>
+    <ul class="cart-items-list" id="cart-items"></ul>
+    <div class="cart-empty" id="cart-empty">Your cart is empty</div>
+    <div class="cart-total" id="cart-total" style="display: none;"></div>
+    <button class="checkout-btn" id="checkout-btn" style="display: none;" onclick="openCheckout()">Proceed to Checkout</button>
+  </div>
+  <!-- Login Modal -->
+  <div id="loginModal" class="modal">
+    <div class="modal-content">
+      <span class="close-btn" onclick="closeLoginModal()">&times;</span>
+      <div class="modal-title">Login</div>
+      <form id="loginForm" onsubmit="login(event)">
+        <div class="form-group">
+          <label>Email *</label>
+          <input type="email" id="loginEmail" required placeholder="your.email@example.com">
+        </div>
+        <div class="form-group">
+          <label>Password *</label>
+          <input type="password" id="loginPassword" required placeholder="Your password">
+        </div>
+        <div id="loginError" class="error-msg"></div>
+        <button type="submit" id="loginBtn" class="submit-btn">Login</button>
+        <button type="button" class="link-btn" onclick="openRegisterModal(); closeLoginModal();">Don't have an account? Sign up</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Register Modal -->
+  <div id="registerModal" class="modal">
+    <div class="modal-content">
+      <span class="close-btn" onclick="closeRegisterModal()">&times;</span>
+      <div class="modal-title">Create Account</div>
+      <form id="registerForm" onsubmit="register(event)">
+        <div class="form-group">
+          <label>Name *</label>
+          <input type="text" id="regName" required placeholder="Your name">
+        </div>
+        <div class="form-group">
+          <label>Email *</label>
+          <input type="email" id="regEmail" required placeholder="your.email@example.com">
+        </div>
+        <div class="form-group">
+          <label>Password *</label>
+          <input type="password" id="regPassword" required minlength="6" placeholder="At least 6 characters">
+        </div>
+        <div class="form-group">
+          <label>Referral Code (Optional)</label>
+          <input type="text" id="regReferral" placeholder="Enter referral code">
+        </div>
+        <div id="regError" class="error-msg"></div>
+        <button type="submit" id="regBtn" class="submit-btn">Create Account</button>
+        <button type="button" class="link-btn" onclick="openLoginModal(); closeRegisterModal();">Already have an account? Login</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Checkout Modal -->
+  <div id="checkoutModal" class="modal">
+    <div class="modal-content">
+      <span class="close-btn" onclick="closeCheckout()">&times;</span>
+      <div class="modal-title">Complete Your Purchase</div>
+      <p style="margin-bottom: 1.5rem; color: #666;">Enter your homework account details</p>
+      <form id="checkoutForm" onsubmit="submitOrder(event)">
+        <div class="form-group">
+          <label>Your Email *</label>
+          <input type="email" id="userEmail" required placeholder="your.email@example.com">
+        </div>
+        <div class="form-group">
+          <label>Homework Account Email *</label>
+          <input type="email" id="homeworkEmail" required placeholder="homework.account@school.com">
+        </div>
+        <div class="form-group">
+          <label>Homework Account Password *</label>
+          <input type="password" id="homeworkPassword" required placeholder="Enter password">
+        </div>
+        <div style="background: #f8f9ff; padding: 1rem; border-radius: 8px; margin: 1.2rem 0;">
+          <strong>Total:</strong> <span id="modalTotal" style="color: #6C63FF; font-size: 1.2rem; font-weight: 700;"></span>
+        </div>
+        <button type="submit" id="submitBtn" class="submit-btn">Pay with Stripe 💳</button>
+      </form>
+    </div>
+  </div>
+
+  <footer>&copy; 2025 hwplug – All rights reserved</footer>
+
+  <script>
+    const stripe = Stripe('pk_test_51SVJJr1EeF1TKcNflJ1Ifz0Kf140GQRLFp5WQ2sE4IB5BmYHk7olziQTwTrzTvSnkzSQxhUzwy12pNqNsjP2c29d00FMgTRZJo');
+    const BACKEND_URL = 'https://hwplug.onrender.com';
+
+    let cart = [];
+    let currentUser = null;
+
+    window.onload = function() {
+      const token = localStorage.getItem('token');
+      if (token) fetchUserProfile(token);
+      updateCart();
+    };
+
+    async function fetchUserProfile(token) {
+      try {
+        const response = await fetch(`${BACKEND_URL}/api/auth/profile`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          currentUser = data.user;
+          updateUserUI();
+        } else {
+          localStorage.removeItem('token');
+        }
+      } catch (error) {
+        console.error('Profile error:', error);
+      }
+    }
+
+    function updateUserUI() {
+      if (currentUser) {
+        document.getElementById('authButtons').style.display = 'none';
+        document.getElementById('userInfo').style.display = 'flex';
+        document.getElementById('userName').textContent = currentUser.name;
+        document.getElementById('userCredits').textContent = currentUser.credits || 0;
+      } else {
+        document.getElementById('authButtons').style.display = 'flex';
+        document.getElementById('userInfo').style.display = 'none';
+      }
+    }
+
+    async function register(event) {
+      event.preventDefault();
+      const regBtn = document.getElementById('regBtn');
+      regBtn.disabled = true;
+      regBtn.textContent = 'Creating...';
+      
+      const name = document.getElementById('regName').value;
+      const email = document.getElementById('regEmail').value;
+      const password = document.getElementById('regPassword').value;
+      const referralCode = document.getElementById('regReferral').value;
+
+      try {
+        const response = await fetch(`${BACKEND_URL}/api/auth/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, password, referralCode })
+        });
+
+        const data = await response.json();
+        if (response.ok) {
+          localStorage.setItem('token', data.token);
+          currentUser = data.user;
+          updateUserUI();
+          closeRegisterModal();
+          alert('Account created! 🎉');
+        } else {
+          document.getElementById('regError').textContent = data.error || 'Registration failed';
+        }
+      } catch (error) {
+        document.getElementById('regError').textContent = 'Something went wrong';
+      }
+
+      regBtn.disabled = false;
+      regBtn.textContent = 'Create Account';
+    }
+
+    async function login(event) {
+      event.preventDefault();
+      const loginBtn = document.getElementById('loginBtn');
+      loginBtn.disabled = true;
+      loginBtn.textContent = 'Logging in...';
+      
+      const email = document.getElementById('loginEmail').value;
+      const password = document.getElementById('loginPassword').value;
+
+      try {
+        const response = await fetch(`${BACKEND_URL}/api/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+
+        const data = await response.json();
+        if (response.ok) {
+          localStorage.setItem('token', data.token);
+          currentUser = data.user;
+          updateUserUI();
+          closeLoginModal();
+        } else {
+          document.getElementById('loginError').textContent = data.error || 'Login failed';
+        }
+      } catch (error) {
+        document.getElementById('loginError').textContent = 'Something went wrong';
+      }
+
+      loginBtn.disabled = false;
+      loginBtn.textContent = 'Login';
+    }
+
+    function logout() {
+      localStorage.removeItem('token');
+      currentUser = null;
+      updateUserUI();
+      document.getElementById('userDropdown').classList.remove('show');
+      alert('Logged out');
+    }
+
+    function toggleDropdown() {
+      document.getElementById('userDropdown').classList.toggle('show');
+    }
+
+    window.onclick = function(event) {
+      if (!event.target.matches('.user-btn')) {
+        const dropdown = document.getElementById('userDropdown');
+        if (dropdown.classList.contains('show')) {
+          dropdown.classList.remove('show');
+        }
+      }
+    };
+
+    function addToCart(name, price) {
+      let item = cart.find(p => p.name === name);
+      if (item) {
+        item.qty += 1;
+      } else {
+        cart.push({ name, price, qty: 1 });
+      }
+      updateCart();
+    }
+
+    function removeFromCart(name) {
+      let item = cart.find(p => p.name === name);
+      if (item && item.qty > 1) {
+        item.qty -= 1;
+      } else {
+        cart = cart.filter(p => p.name !== name);
+      }
+      updateCart();
+    }
+
+    function updateCart() {
+      const itemsEl = document.getElementById('cart-items');
+      const emptyEl = document.getElementById('cart-empty');
+      const totalEl = document.getElementById('cart-total');
+      const checkoutBtn = document.getElementById('checkout-btn');
+      
+      itemsEl.innerHTML = '';
+      let total = 0;
+
+      if (cart.length === 0) {
+        emptyEl.style.display = 'block';
+        totalEl.style.display = 'none';
+        checkoutBtn.style.display = 'none';
+      } else {
+        emptyEl.style.display = 'none';
+        totalEl.style.display = 'block';
+        checkoutBtn.style.display = 'block';
+        
+        cart.forEach(product => {
+          const li = document.createElement('li');
+          li.className = 'cart-item';
+          li.innerHTML = `
+            <span class="cart-item-name">${product.name} ×${product.qty}</span>
+            <span>
+              £${product.price * product.qty}
+              <button class="remove-btn" onclick="removeFromCart('${product.name}')">−</button>
+            </span>
+          `;
+          itemsEl.appendChild(li);
+          total += product.price * product.qty;
+        });
+
+        if (currentUser && currentUser.credits > 0) {
+          const creditsToUse = Math.min(currentUser.credits, total);
+          total -= creditsToUse;
+          totalEl.innerHTML = `Total: £${total.toFixed(2)} <small style="color: #00D084;">(£${creditsToUse} credit applied)</small>`;
+        } else {
+          totalEl.textContent = `Total: £${total.toFixed(2)}`;
+        }
+      }
+    }
+    function openLoginModal() {
+      document.getElementById('loginModal').style.display = 'block';
+      document.getElementById('loginError').textContent = '';
+    }
+
+    function closeLoginModal() {
+      document.getElementById('loginModal').style.display = 'none';
+    }
+
+    function openRegisterModal() {
+      document.getElementById('registerModal').style.display = 'block';
+      document.getElementById('regError').textContent = '';
+    }
+
+    function closeRegisterModal() {
+      document.getElementById('registerModal').style.display = 'none';
+    }
+
+    function openCheckout() {
+      const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+      document.getElementById('modalTotal').textContent = `£${total.toFixed(2)}`;
+      document.getElementById('checkoutModal').style.display = 'block';
+    }
+
+    function closeCheckout() {
+      document.getElementById('checkoutModal').style.display = 'none';
+    }
+
+    async function submitOrder(event) {
+      event.preventDefault();
+      
+      const submitBtn = document.getElementById('submitBtn');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Processing...';
+      
+      const customerEmail = document.getElementById('userEmail').value;
+      const homeworkEmail = document.getElementById('homeworkEmail').value;
+      const homeworkPassword = document.getElementById('homeworkPassword').value;
+      
+      try {
+        const response = await fetch(`${BACKEND_URL}/create-checkout-session`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            items: cart,
+            customerEmail,
+            homeworkEmail,
+            homeworkPassword,
+            userId: currentUser ? currentUser.id : null
+          })
+        });
+
+        const session = await response.json();
+        
+        const result = await stripe.redirectToCheckout({
+          sessionId: session.id
+        });
+
+        if (result.error) {
+          alert(result.error.message);
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Pay with Stripe 💳';
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        alert('Something went wrong. Please try again.');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Pay with Stripe 💳';
+      }
+    }
+
+    function showOrders() {
+      alert('Orders feature coming soon!');
+      document.getElementById('userDropdown').classList.remove('show');
+    }
+
+    function showReferral() {
+      if (currentUser) {
+        alert(`Your referral code: ${currentUser.referralCode}\n\nShare this with friends to earn £2 per referral!`);
+      }
+      document.getElementById('userDropdown').classList.remove('show');
+    }
+  </script>
+</body>
+</html>
